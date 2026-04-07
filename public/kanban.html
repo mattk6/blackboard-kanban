@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Blackboard Kanban</title>
+    <link rel="stylesheet" href="kanban.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="header-left">
+          <img src="icons/icon_32.png" alt="Blackboard Kanban icon" class="header-icon" />
+          <h1 class="header-title">Blackboard Kanban</h1>
+        </div>
+        <div class="header-actions">
+          <button id="newAssignmentBtn" class="btn btn-primary">+ New Assignment</button>
+          <button id="clearAllBtn" class="btn btn-danger">Clear All</button>
+        </div>
+      </header>
+
+      <div class="filter-bar hidden" id="filterBar">
+        <span class="filter-label">Filter by course:</span>
+        <div class="filter-chips" id="filterChips"></div>
+        <button class="filter-clear hidden" id="filterClearBtn">Show All</button>
+      </div>
+
+      <main class="board">
+        <div class="column" id="col-ready" data-status="ready">
+          <div class="column-header">
+            <span class="column-title">Ready</span>
+            <span class="column-count" id="count-ready">0</span>
+          </div>
+          <div class="column-cards" id="cards-ready"></div>
+        </div>
+
+        <div class="column" id="col-inprogress" data-status="inprogress">
+          <div class="column-header">
+            <span class="column-title">In Progress</span>
+            <span class="column-count" id="count-inprogress">0</span>
+          </div>
+          <div class="column-cards" id="cards-inprogress"></div>
+        </div>
+
+        <div class="column" id="col-submitted" data-status="submitted">
+          <div class="column-header">
+            <span class="column-title">Submitted</span>
+            <span class="column-count" id="count-submitted">0</span>
+          </div>
+          <div class="column-cards" id="cards-submitted"></div>
+        </div>
+
+        <div class="column" id="col-graded" data-status="graded">
+          <div class="column-header">
+            <span class="column-title">Graded</span>
+            <span class="column-count" id="count-graded">0</span>
+          </div>
+          <div class="column-cards" id="cards-graded"></div>
+        </div>
+      </main>
+    </div>
+
+    <!-- New Assignment Modal -->
+    <div id="modal" class="modal hidden">
+      <div class="modal-content">
+        <h2 class="modal-title">New Assignment</h2>
+
+        <label for="assignmentTitle">Title</label>
+        <input type="text" id="assignmentTitle" placeholder="Assignment name" autocomplete="off" />
+
+        <label for="assignmentCourse">Course</label>
+        <div class="course-row">
+          <input type="text" id="assignmentCourse" list="courseDatalist" placeholder="Course name" autocomplete="off" />
+          <input type="color" id="assignmentColor" value="#4f8ef7" title="Course color" />
+        </div>
+        <datalist id="courseDatalist"></datalist>
+
+        <label for="assignmentDue">Due Date</label>
+        <input type="date" id="assignmentDue" />
+
+        <div class="modal-actions">
+          <button id="saveAssignmentBtn" class="btn btn-primary">Save</button>
+          <button id="cancelModalBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Panel -->
+    <div id="editPanel" class="edit-panel hidden">
+      <div class="edit-panel-content">
+        <div class="edit-panel-header">
+          <h2 class="edit-title" id="editTitle" contenteditable="true" spellcheck="false"></h2>
+          <div class="edit-header-btns">
+            <button class="edit-delete-btn" id="editDeleteBtn" title="Delete assignment">&#128465;</button>
+            <button class="edit-cancel-btn" id="editCancelBtn" title="Close">&#x2715;</button>
+          </div>
+        </div>
+
+        <div class="edit-meta">
+          <span class="edit-course-badge" id="editCourseBadge"></span>
+          <span class="edit-due" id="editDue"></span>
+        </div>
+
+        <div class="edit-section">
+          <label class="edit-label">Notes</label>
+          <textarea id="editNotes" placeholder="Add notes about this assignment..."></textarea>
+        </div>
+
+        <div class="edit-section">
+          <label class="edit-label">Checklist</label>
+          <div id="editChecklist" class="checklist"></div>
+          <div class="checklist-add">
+            <input type="text" id="checklistInput" placeholder="Add a task and press Enter..." />
+            <button id="checklistAddBtn" class="btn btn-secondary">Add</button>
+          </div>
+        </div>
+
+        <button id="editSaveBtn" class="btn btn-primary edit-save-btn">Save Changes</button>
+      </div>
+    </div>
+
+    <script src="kanban.js"></script>
+  </body>
+</html>
