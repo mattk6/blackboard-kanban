@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "WebFetch(domain:www.cune.edu)",
+      "WebFetch(domain:godogs.cune.edu)"
+    ]
+  }
+}
