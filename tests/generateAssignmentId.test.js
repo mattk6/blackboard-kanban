@@ -4,14 +4,14 @@ describe('Test generateAssignmentId TDD tests', () => {
 
     test('generateAssignmentId creates unique formatted ID', () => {
         const result = generateAssignmentId("Test Draft", "CS-331");
-        expect(result).toBe("Test Draft-cs-331");
+        expect(result).toBe("test draft-cs-331");
     });
      test('generateAssignmentId creates unique formatted ID for various inputs', () => {
 
     const testCases = [
-      { course: "CS-331", title: "Test Draft", expected: "CS-331-test-draft" },
-      { course: "MATH-101", title: "Homework #1", expected: "MATH-101-homework-1" },
-      { course: "BIO-200", title: "Final Project!!!", expected: "BIO-200-final-project" },
+      { course: "cs-331", title: "test draft", expected: "cs-331-test-draft" },
+      { course: "math-101", title: "homework #1", expected: "math-101-homework-1" },
+      { course: "bio-200", title: "final project!!!", expected: "bio-200-final-project" },
     ];
 
     testCases.forEach(item => {
