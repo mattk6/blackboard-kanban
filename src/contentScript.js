@@ -29,6 +29,16 @@ function parseCourseId(href) {
 }
 
 /**
+ * Extracts a human-readable course name from the course anchor text.
+ * e.g. "CS-331-01_202620: CS 331 - Software Engineering" → "CS 331 - Software Engineering"
+ * Falls back to the full text if no ": " separator is found.
+ */
+function extractCourseName(text) {
+  const sep = text.indexOf(': ');
+  return sep !== -1 ? text.slice(sep + 2).trim() : text.trim();
+}
+
+/**
  * Finds the scrollable calendar deadlines container.
  * Returns the element, or null if not found.
  */
@@ -98,6 +108,7 @@ function scrapeCalendarDeadlines() {
 
       const assignmentName = nameAnchor.textContent.trim();
       const courseId = parseCourseId(courseAnchor ? courseAnchor.getAttribute('href') : null);
+      const courseName = courseAnchor ? extractCourseName(courseAnchor.textContent) : null;
 
       let dueDate = null;
       const contentEl = card.querySelector('.content');
@@ -115,7 +126,7 @@ function scrapeCalendarDeadlines() {
       const key = `${courseId}|${assignmentName}`;
       if (!seen.has(key)) {
         seen.add(key);
-        results.push({ courseId, assignmentName, dueDate });
+        results.push({ courseId, courseName, assignmentName, dueDate });
       }
     });
   });

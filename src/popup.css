@@ -67,3 +67,32 @@ body {
 .btn-open:hover {
   opacity: 0.88;
 }
+
+.btn-sync {
+  width: 100%;
+  padding: 9px;
+  background: transparent;
+  color: #4f8ef7;
+  border: 1.5px solid #4f8ef7;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.btn-sync:hover {
+  opacity: 0.80;
+}
+
+.btn-sync:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sync-status {
+  font-size: 11px;
+  color: #555;
+  text-align: center;
+  min-height: 14px;
+}

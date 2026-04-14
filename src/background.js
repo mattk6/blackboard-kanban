@@ -27,7 +27,7 @@ function saveScrapedAssignments(scraped, sendResponse) {
       toAdd.push({
         id,
         title: item.assignmentName,
-        course: item.courseId || '',
+        course: item.courseName || item.courseId || '',
         due: item.dueDate || '',
         status: 'ready',
         notes: '',
@@ -65,10 +65,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'TRIGGER_SCRAPE') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.query({ url: ['*://*.blackboard.com/*', '*://*.cune.edu/*'] }, (tabs) => {
       const tab = tabs[0];
       if (!tab) {
-        sendResponse({ error: 'No active tab found.' });
+        sendResponse({ error: 'No Blackboard tab found. Open the Blackboard calendar first.' });
         return;
       }
 

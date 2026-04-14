@@ -431,4 +431,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBoard();
     setupDragAndDrop();
   });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'sync' || !changes.assignments) return;
+    allAssignments = changes.assignments.newValue || [];
+    if (changes.courseColors) courseColors = changes.courseColors.newValue || {};
+    renderFilterBar();
+    renderBoard();
+  });
 });
