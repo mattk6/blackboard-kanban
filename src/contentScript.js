@@ -9,7 +9,6 @@
  * Returns a YYYY-MM-DD string, or null if unparseable.
  */
 function parseDueDateText(text) {
-  // Match M/D/YY or MM/DD/YY patterns after the colon
   const match = text.match(/:\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   if (!match) return null;
   const month = parseInt(match[1], 10);
@@ -30,11 +29,59 @@ function parseCourseId(href) {
 }
 
 /**
- * Scrapes all deadline items from the Blackboard calendar deadlines view.
+ * Finds the scrollable calendar deadlines container.
+ * Returns the element, or null if not found.
+ */
+function findCalendarScrollContainer() {
+  // The deadlines panel is the closest scrollable ancestor of the date groups
+  const firstGroup = document.querySelector('div[id^="bb-calendar1-deadlines-"]');
+  if (!firstGroup) return null;
+
+  let el = firstGroup.parentElement;
+  while (el && el !== document.body) {
+    const style = window.getComputedStyle(el);
+    if (style.overflowY === 'auto' || style.overflowY === 'scroll') return el;
+    el = el.parentElement;
+  }
+
+  // Fallback: return the direct parent of the date groups
+  return firstGroup.parentElement;
+}
+
+/**
+ * Scrolls the container by `delta` pixels and waits `delayMs` for content to load.
+ */
+function scrollStep(container, delta, delayMs) {
+  return new Promise((resolve) => {
+    container.scrollBy({ top: delta, behavior: 'smooth' });
+    setTimeout(resolve, delayMs);
+  });
+}
+
+/**
+ * Scrolls up `steps` times then down `steps * 2` times with a pause between each step,
+ * so AngularJS ng-repeat content above and below the viewport has time to render.
+ * step size is roughly one viewport height of the container.
+ */
+async function scrollToLoadContent(container, steps = 15, stepDelayMs = 400) {
+  const stepSize = container.clientHeight || 400;
+
+  for (let i = 0; i < steps; i++) {
+    await scrollStep(container, -stepSize, stepDelayMs);
+  }
+
+  for (let i = 0; i < steps * 2; i++) {
+    await scrollStep(container, stepSize, stepDelayMs);
+  }
+}
+
+/**
+ * Scrapes all deadline items currently in the DOM.
  * Returns an array of { courseId, assignmentName, dueDate } objects.
  */
 function scrapeCalendarDeadlines() {
   const results = [];
+  const seen = new Set();
   const dateGroups = document.querySelectorAll('div[id^="bb-calendar1-deadlines-"]');
 
   dateGroups.forEach((group) => {
@@ -52,7 +99,6 @@ function scrapeCalendarDeadlines() {
       const assignmentName = nameAnchor.textContent.trim();
       const courseId = parseCourseId(courseAnchor ? courseAnchor.getAttribute('href') : null);
 
-      // Due date is in the first span inside .content that contains "Due"
       let dueDate = null;
       const contentEl = card.querySelector('.content');
       if (contentEl) {
@@ -65,24 +111,44 @@ function scrapeCalendarDeadlines() {
         }
       }
 
-      results.push({ courseId, assignmentName, dueDate });
+      // Deduplicate by courseId + assignmentName
+      const key = `${courseId}|${assignmentName}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push({ courseId, assignmentName, dueDate });
+      }
     });
   });
 
   return results;
 }
 
-// ── Message Handling ──────────────────────────────────────────────────────────
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'SCRAPE_CALENDAR') {
-    const assignments = scrapeCalendarDeadlines();
-    sendResponse({ assignments });
-    return true;
+/**
+ * Full scrape routine: finds the calendar container, scrolls up 15 steps then
+ * down 30 steps to trigger lazy-loaded content, then scrapes all visible deadlines.
+ * Returns a Promise that resolves to an array of { courseId, assignmentName, dueDate }.
+ */
+async function scrapeCalendarWithScrolling() {
+  const container = findCalendarScrollContainer();
+  if (!container) {
+    console.warn('[BB Kanban] Calendar scroll container not found — scraping static DOM.');
+    return scrapeCalendarDeadlines();
   }
 
-  // Send an empty response
-  // See https://github.com/mozilla/webextension-polyfill/issues/130#issuecomment-531531890
+  await scrollToLoadContent(container);
+  return scrapeCalendarDeadlines();
+}
+
+// ── Message Handling ──────────────────────────────────────────────────────────
+
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  if (request.type === 'SCRAPE_CALENDAR') {
+    scrapeCalendarWithScrolling().then((assignments) => {
+      sendResponse({ assignments });
+    });
+    return true; // keep channel open for async response
+  }
+
   sendResponse({});
   return true;
 });
