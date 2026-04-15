@@ -75,10 +75,18 @@ function renderFilterBar() {
 
   chipsEl.innerHTML = '';
   courses.forEach((course) => {
-    const chip = document.createElement('button');
-    chip.className = 'filter-chip' + (activeFilters.has(course) ? ' active' : '');
-    chip.textContent = course;
-    chip.style.setProperty('--chip-color', getCourseColor(course));
+    const color = getCourseColor(course);
+    const isActive = activeFilters.has(course);
+
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip' + (isActive ? ' active' : '');
+    chip.style.setProperty('--chip-color', color);
+
+    const label = document.createElement('span');
+    label.className = 'chip-label';
+    label.textContent = course;
+
+    // Toggle on the chip itself so clicks anywhere (incl. gradient area) work
     chip.addEventListener('click', () => {
       if (activeFilters.has(course)) {
         activeFilters.delete(course);
@@ -88,6 +96,33 @@ function renderFilterBar() {
       renderFilterBar();
       renderBoard();
     });
+
+    // Fade overlay: "...🎨" absolutely positioned over the right edge on hover
+    // pointer-events: none in CSS — clicks fall through to chip toggle above
+    const fade = document.createElement('span');
+    fade.className = 'chip-fade';
+
+    const swatchBtn = document.createElement('label');
+    swatchBtn.className = 'chip-color-swatch';
+    swatchBtn.title = 'Change course color';
+    swatchBtn.textContent = '🎨';
+    swatchBtn.addEventListener('click', (e) => e.stopPropagation());
+
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.className = 'chip-color-input';
+    colorInput.value = color;
+    colorInput.addEventListener('click', (e) => e.stopPropagation());
+    colorInput.addEventListener('change', (e) => {
+      e.stopPropagation();
+      courseColors[course] = e.target.value;
+      saveData(() => { renderFilterBar(); renderBoard(); });
+    });
+
+    swatchBtn.appendChild(colorInput);
+    fade.appendChild(swatchBtn);
+    chip.appendChild(label);
+    chip.appendChild(fade);
     chipsEl.appendChild(chip);
   });
 
@@ -359,10 +394,14 @@ function setupModal() {
     colorInput.value = '#4f8ef7';
     dueInput.value = '';
 
-    // Populate datalist with known courses
+    // Populate datalist with known courses (from colors map + scraped assignments)
     const dl = document.getElementById('courseDatalist');
     dl.innerHTML = '';
-    Object.keys(courseColors).forEach((name) => {
+    const knownCourses = new Set([
+      ...Object.keys(courseColors),
+      ...allAssignments.map((a) => a.course).filter(Boolean),
+    ]);
+    knownCourses.forEach((name) => {
       const opt = document.createElement('option');
       opt.value = name;
       dl.appendChild(opt);

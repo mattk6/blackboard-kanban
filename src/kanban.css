@@ -101,6 +101,9 @@ body {
 }
 
 .filter-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   border: 2px solid var(--chip-color, #ccc);
   background: transparent;
   color: #444;
@@ -108,6 +111,8 @@ body {
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
@@ -117,8 +122,69 @@ body {
   color: #fff;
 }
 
-.filter-chip:hover {
-  opacity: 0.8;
+.chip-label {
+  pointer-events: none; /* chip div handles the click */
+}
+
+/* Fade overlay — pointer-events: none so clicks fall through to chip toggle */
+.chip-fade {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  padding-left: 18px;
+  padding-right: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  /* inactive: sharp fade transparent → white over ~3 chars */
+  background: linear-gradient(to right, transparent 0%, #fff 65%);
+}
+
+.filter-chip.active .chip-fade {
+  background: linear-gradient(to right, transparent 0%, var(--chip-color) 65%);
+}
+
+.filter-chip:hover .chip-fade {
+  opacity: 1;
+}
+
+/* Palette emoji pill — pointer-events: none until hover */
+.chip-color-swatch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 5px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: none;
+  /* inactive: solid pill in course color */
+  background: var(--chip-color, #ccc);
+}
+
+.filter-chip:hover .chip-color-swatch {
+  pointer-events: auto;
+}
+
+.filter-chip.active .chip-color-swatch {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* native color input hidden under the emoji, triggered by clicking the label */
+.chip-color-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  border: none;
+  padding: 0;
 }
 
 .filter-clear {
