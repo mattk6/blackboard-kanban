@@ -422,19 +422,11 @@ function setupModal() {
   const modal = document.getElementById('modal');
   const titleInput = document.getElementById('assignmentTitle');
   const courseInput = document.getElementById('assignmentCourse');
-  const colorInput = document.getElementById('assignmentColor');
   const dueInput = document.getElementById('assignmentDue');
-
-  // Auto-fill color when a known course name is typed
-  courseInput.addEventListener('input', () => {
-    const known = courseColors[courseInput.value.trim()];
-    if (known) colorInput.value = known;
-  });
 
   document.getElementById('newAssignmentBtn').addEventListener('click', () => {
     titleInput.value = '';
     courseInput.value = '';
-    colorInput.value = '#4f8ef7';
     dueInput.value = '';
 
     // Populate datalist with known courses (from colors map + scraped assignments)
@@ -461,9 +453,8 @@ function setupModal() {
     const title = titleInput.value.trim();
     if (!title) { titleInput.focus(); return; }
     const course = courseInput.value.trim();
-    const color = colorInput.value;
 
-    if (course) courseColors[course] = clampColorBrightness(color);
+    if (course && !courseColors[course]) courseColors[course] = '#4f8ef7';
 
     allAssignments.push({
       id: Date.now().toString(),

@@ -425,26 +425,6 @@ body {
   border-color: #4f8ef7;
 }
 
-.course-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.course-row input[type="text"] {
-  flex: 1;
-}
-
-.course-row input[type="color"] {
-  width: 40px;
-  height: 36px;
-  padding: 2px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  cursor: pointer;
-  background: none;
-  flex-shrink: 0;
-}
 
 .modal-actions {
   display: flex;
