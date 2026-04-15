@@ -215,6 +215,7 @@ function createCardEl(assignment) {
           <button class="card-btn move-left" title="Move left">&larr;</button>
           <button class="card-btn move-right" title="Move right">&rarr;</button>
         </div>
+        ${assignment.url ? `<a class="card-btn card-link" href="${escapeHtml(assignment.url)}" target="_blank" rel="noopener noreferrer" title="Open in Blackboard">&#8599;</a>` : ''}
       </div>
     </div>
   `;
@@ -320,6 +321,15 @@ function openEditPanel(id) {
     dueEl.className = 'edit-due' + (due.overdue ? ' overdue' : '');
   } else {
     dueEl.textContent = '';
+  }
+
+  // Blackboard link
+  const linkEl = document.getElementById('editLink');
+  if (assignment.url) {
+    linkEl.href = assignment.url;
+    linkEl.classList.remove('hidden');
+  } else {
+    linkEl.classList.add('hidden');
   }
 
   // Notes

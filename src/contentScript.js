@@ -1,5 +1,22 @@
 'use strict';
 
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+/**
+ * Polls `predicate` every `intervalMs` until it returns a truthy value or
+ * `timeoutMs` elapses.  Resolves with the truthy value or null on timeout.
+ */
+function waitFor(predicate, timeoutMs = 6000, intervalMs = 150) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const id = setInterval(() => {
+      const val = predicate();
+      if (val) { clearInterval(id); resolve(val); return; }
+      if (Date.now() - start > timeoutMs) { clearInterval(id); resolve(null); }
+    }, intervalMs);
+  });
+}
+
 // ── Calendar Scraper ──────────────────────────────────────────────────────────
 
 /**
@@ -102,7 +119,7 @@ function scrapeCalendarDeadlines() {
       );
       const courseAnchor = card.querySelector(
         'a[analytics-id="components.directives.calendar.deadlines.navigation.openCourseOutline"]'
-      );
+      ) || card.querySelector('a[href*="/courses/"][href*="/outline"]');
 
       if (!nameAnchor) return;
 
@@ -126,12 +143,94 @@ function scrapeCalendarDeadlines() {
       const key = `${courseId}|${assignmentName}`;
       if (!seen.has(key)) {
         seen.add(key);
-        results.push({ courseId, courseName, assignmentName, dueDate });
+        // _anchor kept for click-through enrichment; stripped before returning to background
+        results.push({ courseId, courseName, assignmentName, dueDate, _anchor: nameAnchor });
       }
     });
   });
 
   return results;
+}
+
+/**
+ * Reads the Blackboard content ID for the currently open assessment overview panel,
+ * but only if the panel's visible title matches `expectedName`.
+ * Uses AngularJS scope introspection — no navigation required.
+ */
+function readPanelContentId(expectedName) {
+  const header = document.querySelector('assessment-overview-panel-header');
+  if (!header) return null;
+
+  // Confirm the panel has rendered the right assignment
+  const h1 = header.querySelector('.js-header-text');
+  if (!h1 || h1.textContent.trim() !== expectedName) return null;
+
+  try {
+    const ang = window.angular;
+    if (!ang) return null;
+
+    // Components may use an isolate scope with the bound attribute normalised to camelCase
+    const iso = ang.element(header).isolateScope();
+    if (iso?.contentId) return iso.contentId;
+
+    // Fall back to the parent controller scope
+    const scope = ang.element(header).scope();
+    return scope?.assessmentOverview?.content?.id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * For each scraped result that has a `_anchor` element, clicks the card to open
+ * the Blackboard detail panel, reads the AngularJS content ID, then dismisses
+ * the panel with Escape.  Adds `contentId` to each result in-place.
+ *
+ * All DOM interaction happens inside the user's live browser session — no extra
+ * authentication or headless browser needed.
+ */
+async function enrichWithContentIds(results) {
+  if (!window.angular) {
+    console.warn('[BB Kanban] AngularJS not detected — skipping contentId enrichment.');
+    return;
+  }
+
+  const CARD_ANCHOR_SELECTOR =
+    'a[analytics-id="components.directives.calendar.deadlines.navigation.openDueDateItem"]';
+
+  for (const item of results) {
+    // Re-acquire anchor in case virtual scrolling detached the stored reference
+    let anchor = item._anchor?.isConnected ? item._anchor : null;
+    if (!anchor) {
+      for (const a of document.querySelectorAll(CARD_ANCHOR_SELECTOR)) {
+        if (a.textContent.trim() === item.assignmentName) { anchor = a; break; }
+      }
+    }
+    if (!anchor) {
+      console.warn(`[BB Kanban] Card anchor not found for "${item.assignmentName}" — skipping`);
+      continue;
+    }
+
+    // Bring the card into view, then click it to open the detail panel
+    anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await new Promise((r) => setTimeout(r, 250));
+    anchor.click();
+
+    // Wait for the panel to show this specific assignment and expose a content ID
+    const contentId = await waitFor(() => readPanelContentId(item.assignmentName), 6000, 150);
+
+    if (contentId) {
+      item.contentId = contentId;
+    } else {
+      console.warn(`[BB Kanban] Timed out waiting for contentId on "${item.assignmentName}"`);
+    }
+
+    // Dismiss the panel and give it a moment to close
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true, cancelable: true })
+    );
+    await new Promise((r) => setTimeout(r, 400));
+  }
 }
 
 /**
@@ -147,7 +246,15 @@ async function scrapeCalendarWithScrolling() {
   }
 
   await scrollToLoadContent(container);
-  return scrapeCalendarDeadlines();
+  const results = scrapeCalendarDeadlines();
+
+  // Phase 2: click each card to pull content IDs from the AngularJS scope
+  await enrichWithContentIds(results);
+
+  // Strip internal references before handing data to the background script
+  for (const item of results) delete item._anchor;
+
+  return results;
 }
 
 // ── Message Handling ──────────────────────────────────────────────────────────
@@ -155,7 +262,7 @@ async function scrapeCalendarWithScrolling() {
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.type === 'SCRAPE_CALENDAR') {
     scrapeCalendarWithScrolling().then((assignments) => {
-      sendResponse({ assignments });
+      sendResponse({ assignments, origin: window.location.origin });
     });
     return true; // keep channel open for async response
   }

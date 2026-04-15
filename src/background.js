@@ -9,26 +9,41 @@ import { generateAssignmentId, isValidSemesterDate } from './utils.js';
  * - Skips items whose due date fails isValidSemesterDate.
  * - Skips items whose generated ID already exists in storage.
  */
-function saveScrapedAssignments(scraped, sendResponse) {
+function saveScrapedAssignments(scraped, origin, sendResponse) {
   chrome.storage.sync.get(['assignments'], (result) => {
     const existing = result.assignments || [];
-    const existingIds = new Set(existing.map((a) => a.id));
+    // Index by id for O(1) lookup and in-place mutation
+    const existingById = Object.fromEntries(existing.map((a) => [a.id, a]));
 
     const toAdd = [];
     let skippedDate = 0;
     let skippedDuplicate = 0;
+    let backfilled = 0;
 
     for (const item of scraped) {
       if (!isValidSemesterDate(item.dueDate || '')) { skippedDate++; continue; }
 
       const id = generateAssignmentId(item.courseId || '', item.assignmentName);
-      if (existingIds.has(id)) { skippedDuplicate++; continue; }
+      const course = item.courseName || item.courseId || '';
+      const url = (origin && item.courseId && item.contentId)
+        ? `${origin}/ultra/courses/${item.courseId}/outline/assessment/${item.contentId}/overview?courseId=${item.courseId}`
+        : '';
+
+      if (existingById[id]) {
+        // Backfill course name and url if they were missing on the existing record
+        const rec = existingById[id];
+        if (course && !rec.course) { rec.course = course; backfilled++; }
+        if (url   && !rec.url)    { rec.url   = url;    backfilled++; }
+        skippedDuplicate++;
+        continue;
+      }
 
       toAdd.push({
         id,
         title: item.assignmentName,
-        course: item.courseName || item.courseId || '',
+        course,
         due: item.dueDate || '',
+        url,
         status: 'ready',
         notes: '',
         checklist: [],
@@ -37,11 +52,11 @@ function saveScrapedAssignments(scraped, sendResponse) {
 
     console.log(
       `[BB Kanban] Scrape complete — scraped: ${scraped.length}, ` +
-      `skipped (date): ${skippedDate}, skipped (duplicate): ${skippedDuplicate}, ` +
-      `saved: ${toAdd.length}`
+      `skipped (date): ${skippedDate}, duplicates: ${skippedDuplicate}, ` +
+      `backfilled: ${backfilled}, added: ${toAdd.length}`
     );
 
-    if (toAdd.length === 0) {
+    if (toAdd.length === 0 && backfilled === 0) {
       sendResponse({ added: 0 });
       return;
     }
@@ -77,7 +92,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ error: chrome.runtime.lastError?.message || 'No response from content script.' });
           return;
         }
-        saveScrapedAssignments(response.assignments || [], sendResponse);
+        saveScrapedAssignments(response.assignments || [], response.origin || '', sendResponse);
       });
     });
     return true; // keep channel open for async response

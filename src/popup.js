@@ -21,7 +21,7 @@ document.getElementById('syncBtn').addEventListener('click', () => {
 
   btn.disabled = true;
   btn.textContent = 'Syncing…';
-  status.textContent = 'Scrolling calendar to load all assignments…';
+  status.textContent = 'Scrolling calendar and fetching assignment details… (may take a minute)';
 
   chrome.runtime.sendMessage({ type: 'TRIGGER_SCRAPE' }, (response) => {
     btn.disabled = false;

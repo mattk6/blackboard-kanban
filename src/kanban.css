@@ -373,6 +373,17 @@ body {
   background: #d1d5db;
 }
 
+.card-link {
+  text-decoration: none;
+  font-size: 13px;
+  padding: 3px 6px;
+}
+
+.card-link:hover {
+  background: #d1d5db;
+  color: #333;
+}
+
 /* ── New Assignment Modal ────────────────────────────────────────────────────── */
 
 .modal {
@@ -547,6 +558,18 @@ body {
 .edit-due.overdue {
   color: #e05c5c;
   font-weight: 700;
+}
+
+.edit-link {
+  display: inline-block;
+  font-size: 13px;
+  color: #4f8ef7;
+  text-decoration: none;
+  margin-top: 6px;
+}
+
+.edit-link:hover {
+  text-decoration: underline;
 }
 
 .edit-panel-body {
