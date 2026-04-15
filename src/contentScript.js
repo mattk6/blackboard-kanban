@@ -153,48 +153,55 @@ function scrapeCalendarDeadlines() {
 }
 
 /**
- * Reads the Blackboard content ID for the currently open assessment overview panel,
- * but only if the panel's visible title matches `expectedName`.
- * Uses AngularJS scope introspection — no navigation required.
+ * Injects a tiny <script> into the page's MAIN world so it can access
+ * window.angular (which is invisible from a content script's isolated world).
+ * The injected code reads the AngularJS scope on the assessment-overview panel
+ * header and posts the content ID back via window.postMessage.
  */
-function readPanelContentId(expectedName) {
-  const header = document.querySelector('assessment-overview-panel-header');
-  if (!header) return null;
+function readContentIdFromPageScope() {
+  return new Promise((resolve) => {
+    const MSG_TYPE = 'BB_KANBAN_CONTENT_ID';
 
-  // Confirm the panel has rendered the right assignment
-  const h1 = header.querySelector('.js-header-text');
-  if (!h1 || h1.textContent.trim() !== expectedName) return null;
+    const handler = (event) => {
+      if (event.source !== window || event.data?.type !== MSG_TYPE) return;
+      window.removeEventListener('message', handler);
+      resolve(event.data.contentId || null);
+    };
+    window.addEventListener('message', handler);
 
-  try {
-    const ang = window.angular;
-    if (!ang) return null;
+    const script = document.createElement('script');
+    script.textContent = `(function(){
+      var cid = null;
+      try {
+        var hdr = document.querySelector('assessment-overview-panel-header');
+        if (hdr && window.angular) {
+          var el = angular.element(hdr);
+          var iso = el.isolateScope && el.isolateScope();
+          cid = (iso && iso.contentId) || null;
+          if (!cid) {
+            var s = el.scope();
+            cid = (s && s.assessmentOverview && s.assessmentOverview.content
+                   && s.assessmentOverview.content.id) || null;
+          }
+        }
+      } catch(e) {}
+      window.postMessage({type:'BB_KANBAN_CONTENT_ID', contentId: cid}, '*');
+    })();`;
+    (document.head || document.documentElement).appendChild(script);
+    script.remove();
 
-    // Components may use an isolate scope with the bound attribute normalised to camelCase
-    const iso = ang.element(header).isolateScope();
-    if (iso?.contentId) return iso.contentId;
-
-    // Fall back to the parent controller scope
-    const scope = ang.element(header).scope();
-    return scope?.assessmentOverview?.content?.id || null;
-  } catch (_) {
-    return null;
-  }
+    setTimeout(() => { window.removeEventListener('message', handler); resolve(null); }, 2000);
+  });
 }
 
 /**
- * For each scraped result that has a `_anchor` element, clicks the card to open
- * the Blackboard detail panel, reads the AngularJS content ID, then dismisses
- * the panel with Escape.  Adds `contentId` to each result in-place.
- *
- * All DOM interaction happens inside the user's live browser session — no extra
- * authentication or headless browser needed.
+ * For each scraped result, clicks its calendar card to open the detail panel,
+ * then extracts the Blackboard content ID using two strategies:
+ *   1. Parse it from the URL (Blackboard may update the hash/path when the panel opens)
+ *   2. Inject a page-world script to read the AngularJS scope
+ * Adds `contentId` to each result in-place.
  */
 async function enrichWithContentIds(results) {
-  if (!window.angular) {
-    console.warn('[BB Kanban] AngularJS not detected — skipping contentId enrichment.');
-    return;
-  }
-
   const CARD_ANCHOR_SELECTOR =
     'a[analytics-id="components.directives.calendar.deadlines.navigation.openDueDateItem"]';
 
@@ -216,13 +223,50 @@ async function enrichWithContentIds(results) {
     await new Promise((r) => setTimeout(r, 250));
     anchor.click();
 
-    // Wait for the panel to show this specific assignment and expose a content ID
-    const contentId = await waitFor(() => readPanelContentId(item.assignmentName), 6000, 150);
+    // Wait for the panel to appear with the correct assignment title
+    const panelReady = await waitFor(() => {
+      const h1 = document.querySelector('assessment-overview-panel-header .js-header-text');
+      return h1 && h1.textContent.trim() === item.assignmentName;
+    }, 6000, 150);
+
+    let contentId = null;
+
+    if (panelReady) {
+      // Strategy 1: Blackboard updates the URL when the panel opens
+      // e.g. /ultra/calendar/assessment/_2439749_1/overview?courseId=_51705_1
+      const url = window.location.href;
+      const cidMatch = url.match(/\/assessment\/(_\d+_\d+)\//);
+      if (cidMatch) contentId = cidMatch[1];
+
+      // Also grab courseId from the URL query param as a fallback
+      if (!item.courseId) {
+        const qMatch = url.match(/[?&]courseId=(_\d+_\d+)/);
+        if (qMatch) item.courseId = qMatch[1];
+      }
+
+      // Strategy 2: inject into page's main world to read Angular scope
+      if (!contentId) contentId = await readContentIdFromPageScope();
+
+      // Scrape submission/graded status from the panel DOM
+      // 1. Grade card: present when graded (even if attempts remain)
+      const gradeCard = document.querySelector('.js-attempt-posted');
+      const submissionLabel = document.querySelector('.submission-label');
+      if (gradeCard || (submissionLabel && /grade|score/i.test(submissionLabel.textContent))) {
+        item.submitted = true;
+      }
+      // 2. Button text: "View submission" when submitted but not yet graded
+      if (!item.submitted) {
+        const btnLabel = document.querySelector('.label-button-attempt');
+        if (btnLabel && /submission|review/i.test(btnLabel.textContent)) {
+          item.submitted = true;
+        }
+      }
+    }
 
     if (contentId) {
       item.contentId = contentId;
     } else {
-      console.warn(`[BB Kanban] Timed out waiting for contentId on "${item.assignmentName}"`);
+      console.warn(`[BB Kanban] Could not extract contentId for "${item.assignmentName}"`);
     }
 
     // Dismiss the panel and give it a moment to close

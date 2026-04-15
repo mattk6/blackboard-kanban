@@ -560,18 +560,6 @@ body {
   font-weight: 700;
 }
 
-.edit-link {
-  display: inline-block;
-  font-size: 13px;
-  color: #4f8ef7;
-  text-decoration: none;
-  margin-top: 6px;
-}
-
-.edit-link:hover {
-  text-decoration: underline;
-}
-
 .edit-panel-body {
   flex: 1;
   overflow-y: auto;

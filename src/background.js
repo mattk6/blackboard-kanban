@@ -20,20 +20,34 @@ function saveScrapedAssignments(scraped, origin, sendResponse) {
     let skippedDuplicate = 0;
     let backfilled = 0;
 
+    const now = Date.now();
     for (const item of scraped) {
       if (!isValidSemesterDate(item.dueDate || '')) { skippedDate++; continue; }
 
+      // Skip assignments more than 7 days past due
+      if (item.dueDate) {
+        const dueMs = new Date(item.dueDate + 'T23:59:59').getTime();
+        if (now - dueMs > 7 * 86400000) { skippedDate++; continue; }
+      }
+
       const id = generateAssignmentId(item.courseId || '', item.assignmentName);
       const course = item.courseName || item.courseId || '';
-      const url = (origin && item.courseId && item.contentId)
-        ? `${origin}/ultra/courses/${item.courseId}/outline/assessment/${item.contentId}/overview?courseId=${item.courseId}`
+      const basePath = (origin && item.courseId && item.contentId)
+        ? `${origin}/ultra/courses/${item.courseId}/outline/assessment/${item.contentId}/overview`
+        : '';
+      const url = basePath
+        ? basePath + (item.submitted ? '' : '/attempt/create') + `?courseId=${item.courseId}`
         : '';
 
       if (existingById[id]) {
-        // Backfill course name and url if they were missing on the existing record
+        // Backfill course name, url, and submission status on the existing record
         const rec = existingById[id];
         if (course && !rec.course) { rec.course = course; backfilled++; }
-        if (url   && !rec.url)    { rec.url   = url;    backfilled++; }
+        if (url && url !== rec.url) { rec.url = url; backfilled++; }
+        // Auto-advance status if Blackboard says it's submitted
+        if (item.submitted && (rec.status === 'ready' || rec.status === 'inprogress')) {
+          rec.status = 'submitted'; backfilled++;
+        }
         skippedDuplicate++;
         continue;
       }
@@ -44,7 +58,7 @@ function saveScrapedAssignments(scraped, origin, sendResponse) {
         course,
         due: item.dueDate || '',
         url,
-        status: 'ready',
+        status: item.submitted ? 'submitted' : 'ready',
         notes: '',
         checklist: [],
       });

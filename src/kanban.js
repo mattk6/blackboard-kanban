@@ -323,15 +323,6 @@ function openEditPanel(id) {
     dueEl.textContent = '';
   }
 
-  // Blackboard link
-  const linkEl = document.getElementById('editLink');
-  if (assignment.url) {
-    linkEl.href = assignment.url;
-    linkEl.classList.remove('hidden');
-  } else {
-    linkEl.classList.add('hidden');
-  }
-
   // Notes
   document.getElementById('editNotes').value = assignment.notes || '';
 
