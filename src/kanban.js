@@ -50,7 +50,7 @@ function formatDue(dateStr) {
 }
 
 function getCourseColor(course) {
-  return (course && courseColors[course]) || '#d1d5db';
+  return (course && courseColors[course]) || '#cdcdcd';
 }
 
 // Clamp a hex color's HSL lightness to [25%, 75%] to avoid near-black or near-white course colors.
@@ -455,7 +455,7 @@ function setupModal() {
     if (!title) { titleInput.focus(); return; }
     const course = courseInput.value.trim();
 
-    if (course && !courseColors[course]) courseColors[course] = '#4f8ef7';
+    if (course && !courseColors[course]) courseColors[course] = '#006dc7';
 
     allAssignments.push({
       id: Date.now().toString(),

@@ -13,3 +13,6 @@ npm-debug.log*
 
 # packed files
 /release
+
+# scraped resources
+web page scrape all resources/
